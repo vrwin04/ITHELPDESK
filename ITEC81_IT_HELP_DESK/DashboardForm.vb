@@ -12,6 +12,10 @@ Public Class DashboardForm
     Private dtTickets As New DataTable
     Private CategoryCounts As New Dictionary(Of String, Integer)
 
+    ' --- ANIMATION VARIABLES ---
+    Private WithEvents tmrGraphAnim As New Timer With {.Interval = 15} ' Runs every 15ms
+    Private animProgress As Single = 0.0F ' 0.0 to 1.0
+
     ' --- UI CONTROLS ---
     Private WithEvents ui_pnlHeader As New Panel
     Private WithEvents ui_pnlSidebar As New Panel
@@ -36,7 +40,7 @@ Public Class DashboardForm
     ' Admin Grid View
     Private WithEvents ui_dgvTickets As New DataGridView
 
-    ' Student Text View (NEW)
+    ' Student Text View
     Private WithEvents ui_flpHistory As New FlowLayoutPanel
 
     ' Controls
@@ -65,11 +69,11 @@ Public Class DashboardForm
         If Session.CurrentUserRole = "Student" Then
             ApplyStudentLayout()
             LoadTickets()
-            ShowView("Tickets") ' Student starts at History
+            ShowView("Tickets")
         Else
             ApplyAdminLayout()
             LoadTickets()
-            ShowView("Dashboard") ' Admin starts at Dashboard
+            ShowView("Dashboard")
         End If
     End Sub
 
@@ -98,7 +102,6 @@ Public Class DashboardForm
         ' Nav Buttons
         CreateNavBtn(ui_btnNavLogout, "Log Out", DockStyle.Bottom)
 
-        ' --- FIX: Changed "Manager" to "Admin" to match Form1.vb creation logic ---
         If Session.CurrentUserRole = "Admin" Then CreateNavBtn(ui_btnNavUsers, "Manage Users", DockStyle.Top)
 
         Dim tListTitle As String = If(Session.CurrentUserRole = "Student", "My Concerns", "Ticket Management")
@@ -195,7 +198,7 @@ Public Class DashboardForm
         ui_dgvTickets.SelectionMode = DataGridViewSelectionMode.FullRowSelect
         ui_dgvTickets.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
 
-        ' -- STUDENT HISTORY LIST (NEW) --
+        ' -- STUDENT HISTORY LIST --
         ui_flpHistory.Parent = ui_pnlViewTickets
         ui_flpHistory.Location = New Point(0, 50)
         ui_flpHistory.Size = New Size(ui_pnlViewTickets.Width, ui_pnlViewTickets.Height - 50)
@@ -243,33 +246,25 @@ Public Class DashboardForm
 
     ' --- 2. LAYOUT LOGIC ---
     Private Sub ApplyStudentLayout()
-        ' Hide Admin stuff
-        ui_btnNavDashboard.Visible = False ' Students don't need stats overview
+        ui_btnNavDashboard.Visible = False
         ui_btnNavUsers.Visible = False
         ui_btnExport.Visible = False
         ui_btnDelete.Visible = False
-        ui_dgvTickets.Visible = False ' HIDE GRID
+        ui_dgvTickets.Visible = False
+        ui_flpHistory.Visible = True
 
-        ' Show Student stuff
-        ui_flpHistory.Visible = True ' SHOW LIST
-
-        ' Config Action Button
         ui_btnAction.Text = "+ New Concern"
         ui_btnAction.BackColor = Color.DodgerBlue
         ui_btnAction.ForeColor = Color.White
     End Sub
 
     Private Sub ApplyAdminLayout()
-        ' Show Admin stuff
         ui_btnNavDashboard.Visible = True
         ui_btnExport.Visible = True
-        ui_dgvTickets.Visible = True ' SHOW GRID
+        ui_dgvTickets.Visible = True
         ui_btnDelete.Visible = True
-
-        ' Hide Student stuff
         ui_flpHistory.Visible = False
 
-        ' Config Action Button
         ui_btnAction.Text = "Mark Resolved"
         ui_btnAction.BackColor = Color.SeaGreen
         ui_btnAction.ForeColor = Color.White
@@ -280,7 +275,7 @@ Public Class DashboardForm
         ui_pnlViewTickets.Visible = (view = "Tickets")
     End Sub
 
-    ' --- 3. DATA LOADING & RENDERING ---
+    ' --- 3. DATA LOADING ---
     Private Sub LoadTickets()
         Using conn As New OleDbConnection(ConnString)
             Try
@@ -301,7 +296,6 @@ Public Class DashboardForm
                 dtTickets = New DataTable()
                 da.Fill(dtTickets)
 
-                ' Render based on role
                 If Session.CurrentUserRole = "Student" Then
                     RenderStudentCards(dtTickets)
                 Else
@@ -310,13 +304,11 @@ Public Class DashboardForm
                 End If
 
             Catch ex As Exception
-                ' Error handling
                 MessageBox.Show("Error loading tickets: " & ex.Message)
             End Try
         End Using
     End Sub
 
-    ' --- NEW: TEXT/CARD RENDERER FOR STUDENTS ---
     Private Sub RenderStudentCards(dt As DataTable)
         ui_flpHistory.Controls.Clear()
         ui_flpHistory.SuspendLayout()
@@ -333,7 +325,6 @@ Public Class DashboardForm
                 pnl.Margin = New Padding(0, 0, 0, 15)
                 pnl.Padding = New Padding(15)
 
-                ' Color Strip based on Status
                 Dim pnlStatus As New Panel
                 pnlStatus.Width = 5
                 pnlStatus.Dock = DockStyle.Left
@@ -341,7 +332,6 @@ Public Class DashboardForm
                 If status = "Resolved" Then pnlStatus.BackColor = Color.SeaGreen Else pnlStatus.BackColor = Color.Orange
                 pnl.Controls.Add(pnlStatus)
 
-                ' Header (Date & Category)
                 Dim lblHead As New Label
                 lblHead.Text = Convert.ToDateTime(row("DateSubmitted")).ToString("MMM dd, yyyy") & "  •  " & row("Category").ToString() & "  •  " & row("Priority").ToString() & " Priority"
                 lblHead.Font = New Font("Segoe UI", 9, FontStyle.Bold)
@@ -350,7 +340,6 @@ Public Class DashboardForm
                 lblHead.AutoSize = True
                 pnl.Controls.Add(lblHead)
 
-                ' Issue Body (Text)
                 Dim lblBody As New Label
                 lblBody.Text = row("IssueSubject").ToString()
                 lblBody.Font = New Font("Segoe UI", 11, FontStyle.Regular)
@@ -359,7 +348,6 @@ Public Class DashboardForm
                 lblBody.AutoEllipsis = True
                 pnl.Controls.Add(lblBody)
 
-                ' Footer (Status text + Remarks)
                 Dim lblFoot As New Label
                 lblFoot.Location = New Point(20, 100)
                 lblFoot.AutoSize = True
@@ -384,7 +372,6 @@ Public Class DashboardForm
     ' --- BUTTON ACTIONS ---
     Private Sub ui_btnAction_Click(sender As Object, e As EventArgs) Handles ui_btnAction.Click
         If Session.CurrentUserRole = "Student" Then
-            ' STUDENT: NEW TICKET
             Dim category As String = ""
             Dim priority As String = ""
             Dim issue As String = ""
@@ -404,7 +391,6 @@ Public Class DashboardForm
                 LoadTickets()
             End If
         Else
-            ' ADMIN: RESOLVE TICKET
             If ui_dgvTickets.SelectedRows.Count = 0 Then Return
             Dim id = Convert.ToInt32(ui_dgvTickets.SelectedRows(0).Cells("TicketID").Value)
             Dim remk = CustomInputBox("Resolution Remarks:", "Resolve")
@@ -421,7 +407,6 @@ Public Class DashboardForm
         End If
     End Sub
 
-    ' --- NAV EVENTS ---
     Private Sub ui_btnNavDashboard_Click(sender As Object, e As EventArgs) Handles ui_btnNavDashboard.Click
         ShowView("Dashboard")
         LoadTickets()
@@ -442,7 +427,25 @@ Public Class DashboardForm
         Me.Close()
     End Sub
 
-    ' --- HELPERS ---
+    Private Sub ui_btnDelete_Click(sender As Object, e As EventArgs) Handles ui_btnDelete.Click
+        If ui_dgvTickets.SelectedRows.Count = 0 Then Return
+        If MessageBox.Show("Delete this ticket?", "Confirm", MessageBoxButtons.YesNo) = DialogResult.Yes Then
+            Dim id = Convert.ToInt32(ui_dgvTickets.SelectedRows(0).Cells("TicketID").Value)
+            Using conn As New OleDbConnection(ConnString)
+                conn.Open()
+                Dim cmd As New OleDbCommand("DELETE FROM tblTickets WHERE TicketID=?", conn)
+                cmd.Parameters.AddWithValue("?", id)
+                cmd.ExecuteNonQuery()
+            End Using
+            LoadTickets()
+        End If
+    End Sub
+
+    Private Sub ui_btnRefresh_Click(sender As Object, e As EventArgs) Handles ui_btnRefresh.Click
+        LoadTickets()
+    End Sub
+
+    ' --- STATS & ANIMATED GRAPH ---
     Private Sub UpdateStats()
         If dtTickets Is Nothing Then Return
         Dim total = dtTickets.Rows.Count
@@ -462,48 +465,101 @@ Public Class DashboardForm
         ui_lblTileTotal.Text = total.ToString()
         ui_lblTilePending.Text = pending.ToString()
         ui_lblTileResolved.Text = resolved.ToString()
-        ui_picGraph.Invalidate()
+
+        ' Reset and Start Animation
+        animProgress = 0
+        tmrGraphAnim.Start()
+    End Sub
+
+    Private Sub tmrGraphAnim_Tick(sender As Object, e As EventArgs) Handles tmrGraphAnim.Tick
+        animProgress += 0.05 ' Increase animation by 5% per tick
+        If animProgress >= 1.0 Then
+            animProgress = 1.0
+            tmrGraphAnim.Stop()
+        End If
+        ui_picGraph.Invalidate() ' Trigger Repaint
     End Sub
 
     Private Sub ui_picGraph_Paint(sender As Object, e As PaintEventArgs) Handles ui_picGraph.Paint
         If CategoryCounts.Count = 0 Then Return
+
         Dim g = e.Graphics
         g.SmoothingMode = SmoothingMode.AntiAlias
+        g.TextRenderingHint = Drawing.Text.TextRenderingHint.ClearTypeGridFit
+
         Dim w = ui_picGraph.Width
         Dim h = ui_picGraph.Height
-        Dim colW = w / CategoryCounts.Count
+        Dim padLeft = 40
+        Dim padBottom = 40
+        Dim graphH = h - padBottom - 20
+        Dim graphW = w - padLeft - 20
+
+        ' 1. Draw Grid Lines (Background)
+        Using gridPen As New Pen(Color.LightGray, 1) With {.DashStyle = DashStyle.Dot}
+            For i As Integer = 0 To 5
+                ' FIX: Convert the calculation to Integer using CInt
+                Dim y As Integer = CInt(20 + (graphH * (i / 5.0)))
+                g.DrawLine(gridPen, padLeft, y, w - 20, y)
+            Next
+        End Using
+
+        ' Calculate Max Value
         Dim maxVal = 1
         For Each v In CategoryCounts.Values
             If v > maxVal Then maxVal = v
         Next
 
-        Dim i = 0
+        ' 2. Draw Bars with Animation
+        Dim colW = graphW / CategoryCounts.Count
+        Dim idx = 0
+
         For Each kvp In CategoryCounts
-            Dim barH = (kvp.Value / maxVal) * (h - 50)
-            Dim rect As New Rectangle(i * colW + 20, h - barH - 30, colW - 40, barH)
-            g.FillRectangle(Brushes.SteelBlue, rect)
-            g.DrawString(kvp.Value.ToString(), Me.Font, Brushes.Black, rect.X + 10, rect.Y - 20)
-            g.DrawString(kvp.Key, Me.Font, Brushes.Black, rect.X, h - 20)
-            i += 1
-        Next
-    End Sub
+            Dim rawHeight = (kvp.Value / maxVal) * graphH
+            Dim animHeight = rawHeight * animProgress ' Scale by animation
 
-    Private Sub ui_btnDelete_Click(sender As Object, e As EventArgs) Handles ui_btnDelete.Click
-        If ui_dgvTickets.SelectedRows.Count = 0 Then Return
-        If MessageBox.Show("Delete this ticket?", "Confirm", MessageBoxButtons.YesNo) = DialogResult.Yes Then
-            Dim id = Convert.ToInt32(ui_dgvTickets.SelectedRows(0).Cells("TicketID").Value)
-            Using conn As New OleDbConnection(ConnString)
-                conn.Open()
-                Dim cmd As New OleDbCommand("DELETE FROM tblTickets WHERE TicketID=?", conn)
-                cmd.Parameters.AddWithValue("?", id)
-                cmd.ExecuteNonQuery()
+            Dim barX = padLeft + (idx * colW) + 15
+            Dim barW = colW - 30
+
+            ' FIX: Convert Y position and Height to Integer for the Rectangle
+            Dim barH_Int As Integer = CInt(animHeight)
+            Dim barY_Int As Integer = CInt((h - padBottom) - animHeight)
+            Dim barX_Int As Integer = CInt(barX)
+            Dim barW_Int As Integer = CInt(barW)
+
+            Dim rect As New Rectangle(barX_Int, barY_Int, barW_Int, barH_Int)
+
+            ' Shadow
+            Using shadowBrush As New SolidBrush(Color.FromArgb(50, 0, 0, 0))
+                g.FillRectangle(shadowBrush, rect.X + 4, rect.Y + 4, rect.Width, rect.Height)
             End Using
-            LoadTickets()
-        End If
-    End Sub
 
-    Private Sub ui_btnRefresh_Click(sender As Object, e As EventArgs) Handles ui_btnRefresh.Click
-        LoadTickets()
+            ' Gradient Body
+            If rect.Height > 0 Then
+                Using br As New LinearGradientBrush(rect, Color.FromArgb(100, 149, 237), Color.FromArgb(25, 25, 112), LinearGradientMode.Vertical)
+                    g.FillRectangle(br, rect)
+                End Using
+                g.DrawRectangle(Pens.DarkBlue, rect)
+            End If
+
+            ' Count Label (Top of Bar)
+            If animProgress > 0.8 Then ' Show text only near end of animation
+                Dim countStr = kvp.Value.ToString()
+                Dim strSize = g.MeasureString(countStr, Me.Font)
+                g.DrawString(countStr, New Font("Segoe UI", 10, FontStyle.Bold), Brushes.Black, rect.X + (rect.Width - strSize.Width) / 2, rect.Y - 20)
+            End If
+
+            ' Category Label (Bottom)
+            Dim catStr = kvp.Key
+            Dim catSize = g.MeasureString(catStr, Me.Font)
+            g.DrawString(catStr, New Font("Segoe UI", 9), Brushes.DimGray, rect.X + (rect.Width - catSize.Width) / 2, h - padBottom + 5)
+
+            idx += 1
+        Next
+
+        ' Draw Axis Lines
+        g.DrawLine(Pens.Gray, padLeft, 20, padLeft, h - padBottom) ' Y Axis
+        g.DrawLine(Pens.Gray, padLeft, h - padBottom, w - 20, h - padBottom) ' X Axis
+
     End Sub
 
     Private Function CustomInputBox(prompt As String, title As String) As String
