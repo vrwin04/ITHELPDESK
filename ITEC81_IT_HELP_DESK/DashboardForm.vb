@@ -97,7 +97,9 @@ Public Class DashboardForm
 
         ' Nav Buttons
         CreateNavBtn(ui_btnNavLogout, "Log Out", DockStyle.Bottom)
-        If Session.CurrentUserRole = "Manager" Then CreateNavBtn(ui_btnNavUsers, "Manage Users", DockStyle.Top)
+
+        ' --- FIX: Changed "Manager" to "Admin" to match Form1.vb creation logic ---
+        If Session.CurrentUserRole = "Admin" Then CreateNavBtn(ui_btnNavUsers, "Manage Users", DockStyle.Top)
 
         Dim tListTitle As String = If(Session.CurrentUserRole = "Student", "My Concerns", "Ticket Management")
         CreateNavBtn(ui_btnNavTickets, tListTitle, DockStyle.Top)
@@ -309,6 +311,7 @@ Public Class DashboardForm
 
             Catch ex As Exception
                 ' Error handling
+                MessageBox.Show("Error loading tickets: " & ex.Message)
             End Try
         End Using
     End Sub
@@ -363,7 +366,7 @@ Public Class DashboardForm
                 lblFoot.Font = New Font("Segoe UI", 9, FontStyle.Regular)
 
                 If status = "Resolved" Then
-                    lblFoot.Text = "Status: Resolved  |  Admin Remarks: " & row("AdminRemarks").ToString()
+                    lblFoot.Text = "Status: Resolved  | Admin Remarks: " & row("AdminRemarks").ToString()
                     lblFoot.ForeColor = Color.SeaGreen
                 Else
                     lblFoot.Text = "Status: Pending (Waiting for support)"
